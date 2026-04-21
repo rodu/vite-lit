@@ -4,6 +4,11 @@ A starter template for building modern UI applications with [Lit](https://lit.de
 
 The included demo renders a list of users fetched from a mock API service, with click-to-select functionality wired through the EventAggregator.
 
+Two Aurelia primitives power the architecture:
+
+- **`Container`** — an Inversion of Control (IoC) container that manages service lifetimes and automatically injects dependencies into components, keeping them decoupled from construction concerns.
+- **`EventAggregator`** — a pub/sub message bus that allows components to communicate without holding direct references to each other.
+
 ## Tech Stack
 
 | Tool                                                                            | Purpose                                |
@@ -44,9 +49,16 @@ src/
 
 ## Key Patterns
 
-### Dependency Injection — `@instance`
+### Dependency Injection — Aurelia `Container` + `@instance`
 
-Services are injected as class properties using the custom `@instance` decorator:
+This project uses Aurelia's `Container` as an IoC container to manage service instances and their dependencies. Rather than manually constructing services or passing them through component trees, the container resolves and provides them automatically. This brings several concrete benefits:
+
+- **Decoupling** — components declare what they need, not how to build it.
+- **Singleton management** — the container ensures a single shared instance of each service across the entire application.
+- **Testability** — services can be swapped out or mocked at the container level without touching component code.
+- **Scalability** — adding a new dependency to a component is a one-line change regardless of how complex the service's own dependencies are.
+
+Because Lit Web Components are not instantiated by the container (the browser creates them), a custom `@instance` property decorator is provided in `src/core/decorators.ts`. It hooks into the globally registered container at property initialisation time, making injection feel natural and requiring zero boilerplate beyond the decorator itself:
 
 ```ts
 import { instance } from '../core/decorators';
@@ -87,9 +99,17 @@ export class MyWidget extends LitElement {
 }
 ```
 
-### Cross-Component Communication — EventAggregator
+### Cross-Component Communication — Aurelia `EventAggregator`
 
-Use the `EventAggregator` for decoupled messaging between components:
+Aurelia's `EventAggregator` is used as the primary mechanism for communication between components. It implements the pub/sub (publish/subscribe) pattern, acting as a central message bus: publishers fire named events with a payload, and any number of subscribers react to them — without either side holding a reference to the other.
+
+This approach is preferred over native DOM events for complex inter-component communication because:
+
+- **No shared references** — components never import or depend on each other directly.
+- **Many-to-many** — multiple components can publish or subscribe to the same event independently.
+- **Decoupled orchestration** — component interactions can be added, changed, or removed without modifying the components themselves.
+
+The `EventAggregator` is itself resolved via the DI container using `@instance`:
 
 ```ts
 import { EventAggregator } from 'aurelia-event-aggregator';
