@@ -1,8 +1,8 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { IUser } from './api-service';
+import { IUser } from '../services/api-service';
 import { EventAggregator } from 'aurelia-event-aggregator';
-import { instance } from './decorators';
+import { instance } from '../core/decorators';
 
 @customElement('user-detail')
 export class UserDetail extends LitElement {

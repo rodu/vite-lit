@@ -1,4 +1,4 @@
 import 'reflect-metadata';
-import './di';
-import './decorators';
-import './my-element';
+import './core/di';
+import './core/decorators';
+import './app';

@@ -1,10 +1,10 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { ApiService, IUser } from './api-service';
-import './user-detail';
+import { ApiService, IUser } from './services/api-service';
+import './components/user-detail';
 import { EventAggregator, Subscription } from 'aurelia-event-aggregator';
-import { instance } from './decorators';
+import { instance } from './core/decorators';
 
 @customElement('my-element')
 class MyElement extends LitElement {
