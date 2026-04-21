@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "wtr",
+    "test:watch": "wtr --watch"
   },
   "dependencies": {
     "aurelia-dependency-injection": "^1.6.1",
@@ -15,6 +17,13 @@
   },
   "devDependencies": {
     "@aurelia/vite-plugin": "^2.0.0-beta.23",
+    "@open-wc/testing": "^4.0.0",
+    "@rollup/plugin-commonjs": "^29.0.2",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "@types/mocha": "^10.0.10",
+    "@web/dev-server-rollup": "^0.6.4",
+    "@web/test-runner": "^0.20.2",
+    "@web/test-runner-playwright": "^0.11.1",
     "reflect-metadata": "^0.2.2",
     "typescript": "~5.7.2",
     "vite": "^6.2.0",

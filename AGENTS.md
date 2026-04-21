@@ -114,3 +114,79 @@ class MyComponent extends LitElement {
 ## Vite Config
 
 The config file is named `xvite.config.ts` (not `vite.config.ts`). Uses `vite-plugin-node-polyfills` for Node.js compatibility.
+
+## Testing
+
+Tests use `@web/test-runner` (WTR) running against real Chromium via Playwright, with TypeScript compiled through `@rollup/plugin-typescript` (not esbuild — esbuild does not support `emitDecoratorMetadata`). The test setup is separate from the Vite build.
+
+```bash
+npm run test        # Run all tests once
+npm run test:watch  # Re-run on file changes
+```
+
+Test files are co-located with components and named `*.test.ts`. The WTR config is `web-test-runner.config.js`.
+
+### Required Import Order in Test Files
+
+`src/test/setup.ts` **must be the very first import** in every test file. It bootstraps `reflect-metadata` and the DI container, and pre-registers all injectable services before any component module is evaluated:
+
+```ts
+import '../test/setup'; // MUST be first
+import { fixture, html, expect, elementUpdated } from '@open-wc/testing';
+import './my-component';
+```
+
+### Why setup.ts Must Come First
+
+The `@instance` decorator calls `Container.get()` at class-definition time (when a component module is first evaluated by the browser). If a service is not already registered, Aurelia falls back to `autoRegister()`, which calls `Reflect.getOwnMetadata()` from `reflect-metadata`. Because the browser's ES module loader does not guarantee evaluation order for sibling imports, `reflect-metadata` may not have run yet — causing a runtime error.
+
+`setup.ts` solves this by calling `Container.instance.registerInstance(ServiceClass, new ServiceClass())` for every injectable service before any component module is imported. `registerInstance` stores a direct-return resolver that bypasses `autoRegister()` entirely.
+
+### Adding a New Service to Tests
+
+When a new service is added to the project, register it in `src/test/setup.ts`:
+
+```ts
+import { MyService } from '../services/my-service';
+
+Container.instance.registerInstance(MyService, new MyService());
+```
+
+### Writing Tests
+
+Tests use Mocha (`describe`/`it`) and Chai assertions. Use `@open-wc/testing` helpers to render components and interact with them:
+
+```ts
+import '../test/setup';
+import { fixture, html, expect, elementUpdated } from '@open-wc/testing';
+import './my-component';
+import type { MyComponent } from './my-component';
+
+describe('MyComponent', () => {
+  it('renders correctly', async () => {
+    const el = await fixture<MyComponent>(html`<my-component></my-component>`);
+    expect(el.shadowRoot!.querySelector('.my-class')).to.not.be.null;
+  });
+
+  it('updates on property change', async () => {
+    const el = await fixture<MyComponent>(html`<my-component></my-component>`);
+    el.label = 'hello';
+    await elementUpdated(el);
+    expect(el.shadowRoot!.textContent).to.include('hello');
+  });
+});
+```
+
+To test EventAggregator interactions, retrieve the shared instance from the container:
+
+```ts
+import { Container } from 'aurelia-dependency-injection';
+import { EventAggregator } from 'aurelia-event-aggregator';
+
+const ea = Container.instance.get(EventAggregator);
+const sub = ea.subscribe('MY_EVENT', (data) => {
+  /* ... */
+});
+// ... trigger the event, then:
+sub.dispose();
+```

@@ -27,11 +27,13 @@ npm run dev      # Start dev server at http://localhost:9000
 
 ## Commands
 
-| Command           | Description                                        |
-| ----------------- | -------------------------------------------------- |
-| `npm run dev`     | Start dev server (auto-opens browser on port 9000) |
-| `npm run build`   | Type-check and build for production                |
-| `npm run preview` | Preview the production build locally               |
+| Command              | Description                                        |
+| -------------------- | -------------------------------------------------- |
+| `npm run dev`        | Start dev server (auto-opens browser on port 9000) |
+| `npm run build`      | Type-check and build for production                |
+| `npm run preview`    | Preview the production build locally               |
+| `npm run test`       | Run all tests once (headless Chromium)             |
+| `npm run test:watch` | Re-run tests on file changes                       |
 
 ## Project Structure
 
@@ -143,6 +145,81 @@ The following `tsconfig.json` settings are required and must not be removed:
 ```
 
 `useDefineForClassFields: false` is necessary for Aurelia's metadata reflection to work correctly with class properties. `strict` mode is enabled.
+
+## Testing
+
+Tests run in a real Chromium browser (via Playwright) using [`@web/test-runner`](https://modern-web.dev/docs/test-runner/overview/). TypeScript is compiled by `@rollup/plugin-typescript` rather than esbuild, because esbuild does not support `emitDecoratorMetadata` — which Aurelia's DI requires.
+
+Test files are co-located with components and named `*.test.ts`.
+
+### Running tests
+
+```bash
+npm run test        # Run all tests once
+npm run test:watch  # Re-run on file changes
+```
+
+### Writing a test
+
+Use [Mocha](https://mochajs.org/) (`describe`/`it`) and [Chai](https://www.chaijs.com/) assertions. [`@open-wc/testing`](https://open-wc.org/docs/testing/testing-package/) provides the `fixture` and `elementUpdated` helpers for rendering and updating Lit components:
+
+```ts
+import '../test/setup'; // MUST be the first import — see below
+import { fixture, html, expect, elementUpdated } from '@open-wc/testing';
+import './my-component';
+import type { MyComponent } from './my-component';
+
+describe('MyComponent', () => {
+  it('renders correctly', async () => {
+    const el = await fixture<MyComponent>(html`<my-component></my-component>`);
+    expect(el.shadowRoot!.querySelector('.my-class')).to.not.be.null;
+  });
+
+  it('updates on property change', async () => {
+    const el = await fixture<MyComponent>(html`<my-component></my-component>`);
+    el.label = 'hello';
+    await elementUpdated(el);
+    expect(el.shadowRoot!.textContent).to.include('hello');
+  });
+});
+```
+
+### The `src/test/setup.ts` bootstrap — why it must come first
+
+`src/test/setup.ts` **must be the first import** in every test file. It handles two things:
+
+1. Imports `reflect-metadata` to polyfill `Reflect.getOwnMetadata`.
+2. Creates the Aurelia `Container` and pre-registers all injectable services.
+
+**Why pre-registration matters:** the `@instance` decorator calls `Container.get()` at class-definition time, the moment a component module is first evaluated by the browser. If the service isn't already registered, Aurelia falls back to `autoRegister()`, which calls `Reflect.getOwnMetadata()`. Because the browser's ES module loader does not guarantee evaluation order for sibling imports, `reflect-metadata` may not have run yet — causing a runtime error.
+
+The fix is `Container.instance.registerInstance(ServiceClass, new ServiceClass())` for every injectable service. This stores a direct-return resolver, so `autoRegister()` is never called.
+
+### Adding a new service to tests
+
+Whenever a new service is added to `src/services/`, register it in `src/test/setup.ts`:
+
+```ts
+import { MyService } from '../services/my-service';
+
+Container.instance.registerInstance(MyService, new MyService());
+```
+
+### Testing EventAggregator interactions
+
+Retrieve the shared `EventAggregator` instance from the container and subscribe before triggering the action under test:
+
+```ts
+import { Container } from 'aurelia-dependency-injection';
+import { EventAggregator } from 'aurelia-event-aggregator';
+
+const ea = Container.instance.get(EventAggregator);
+const sub = ea.subscribe('MY_EVENT', (data) => {
+  /* assert on data */
+});
+// ... trigger the event ...
+sub.dispose();
+```
 
 ## Notes
 
